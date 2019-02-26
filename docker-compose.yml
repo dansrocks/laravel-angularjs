@@ -1,0 +1,64 @@
+version: '3'
+services:
+  webservice:
+    image: nginx:stable-alpine
+    volumes:
+      - "./conf/nginx/default.conf:/etc/nginx/conf.d/default.conf"
+#      - "./etc/ssl:/etc/ssl"
+      - "./src:/var/www/html"
+      - "./conf/nginx/default.template.conf:/etc/nginx/conf.d/default.template"
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - NGINX_HOST=${NGINX_HOST}
+    command: /bin/sh -c "envsubst '$$NGINX_HOST' < /etc/nginx/conf.d/default.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
+    restart: always
+    depends_on:
+      - php-fpm
+      - mysqldb
+  php-fpm:
+    image: php:7.3-fpm-alpine
+    restart: always
+    volumes:
+      - "./conf/php-fpm/php.ini:/usr/local/etc/php/conf.d/php.ini"
+      - "./src:/var/www/html"
+  composer:
+    image: "composer"
+    volumes:
+      - "./src:/app"
+    command: install
+  nodejs:
+    image: node:10.15-alpine
+    volumes:
+      - "./src:/app"
+    working_dir: "/app"
+    environment:
+      NODE_ENV: development
+    command: npm run dev
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    ports:
+      - "8080:80"
+    environment:
+      - PMA_ARBITRARY=1
+      - PMA_HOST=${MYSQL_HOST}
+    restart: always
+    depends_on:
+      - mysqldb
+  mysqldb:
+    image: mysql:${MYSQL_VERSION}
+    container_name: ${MYSQL_HOST}
+    restart: always
+    env_file:
+      - ".env"
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    ports:
+      - "8989:3306"
+    volumes:
+      - "./data/db:/var/lib/mysql"
